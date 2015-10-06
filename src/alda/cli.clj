@@ -8,7 +8,8 @@
             [alda.version      :refer (-version-)]
             [alda.sound        :refer (play!)]
             [alda.util         :as    util]
-            [instaparse.core   :as    insta]))
+            [instaparse.core   :as    insta])
+  (:gen-class))
 
 (def cli-options
   [["-h" "--help" "Display this help text."]
@@ -131,11 +132,13 @@
     (cond
       (and (contains? options :help) (empty? arguments)) ; Generic help, as opposed to per task help
       (do-and-exit-with-error (println help-text))
-      (contains? options :version) (do-and-exit-with-success (printf "alda v%s\n" -version-))
+      (contains? options :version) (do-and-exit-with-success (println (format "alda v%s\n\n" -version-)))
       :else
       (case (first arguments)
         "help"
         (do-and-exit-with-error (println help-text))
+        "version"
+        (do-and-exit-with-error (println (format "alda v%s\n\n" -version-)))
         "parse"
         (let [[{:keys [file code tree lisp]} summary] (command-options args parse-options)]
           (if (or file code)
@@ -150,4 +153,4 @@
         (let [options (command-options args repl-options)]
           (repl (:pre-buffer options) (:post-buffer options)))
         ;; TODO: add script task
-        (do-and-exit-with-error (printf (format "[alda] Invalid command '%s'.\n\n%s\n" (first arguments) summary)))))))
+        (do-and-exit-with-error (println (format "[alda] Invalid command '%s'.\n\n%s\n" (first arguments) summary)))))))
