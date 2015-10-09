@@ -152,5 +152,6 @@
         "repl"
         (let [options (command-options args repl-options)]
           (repl (:pre-buffer options) (:post-buffer options)))
-        ;; TODO: add script task
+        "script"
+        (script)
         (do-and-exit-with-error (println (format "[alda] Invalid command '%s'.\n\n%s\n" (first arguments) summary)))))))
