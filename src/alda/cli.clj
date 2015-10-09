@@ -30,7 +30,7 @@
    file-option
    code-option
    pre-buffer-option
-   (conj post-buffer-option :default 1000)
+   (conj post-buffer-option :default 1500)
    ["-F" "--from N" "Position to start playback from."]
    ["-T" "--to N" "Position to end playback at."]])
 
@@ -41,7 +41,14 @@
                                     :post-buffer post-buffer
                                     :from        from
                                     :to          to
-                                    :one-off?    true}]))
+                                    :one-off?    true}]
+    (if-not (or file code)
+      (play "--help")
+      (let [parsed (parse-input (if code code (slurp file)))]
+        (if (insta/failure? parsed)
+          (do (prn parsed) (System/exit 1))
+          (alda.sound/play! (eval parsed)))))
+    identity))
 
 (defn ^:alda-task script
   "Print the latest `alda` start script to STDOUT."

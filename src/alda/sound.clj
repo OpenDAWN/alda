@@ -184,7 +184,6 @@
                ((:function event))
                (play-event! event inst)))
           pool))
-
     (when-not async?
       ; block until the score is done playing
       (Thread/sleep (+ duration
