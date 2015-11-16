@@ -19,11 +19,20 @@
 
 (def score-parser   (parser-from-grammars "score"
                                           "names"
-                                          "ows"))
+                                          "whitespace"))
 
 (def header-parser  (parser-from-grammars "header"
+                                          "events"
                                           "clojure-cached"
-                                          "ows"))
+                                          "voices"
+                                          "event-sequence"
+                                          "cram"
+                                          "duration"
+                                          "barline"
+                                          "names"
+                                          "numbers"
+                                          "variables"
+                                          "whitespace"))
 
 (def part-parser    (parser-from-grammars "events"
                                           "clojure-cached"
@@ -34,31 +43,8 @@
                                           "barline"
                                           "names"
                                           "numbers"
-                                          "ows"))
-
-(defn- read-clj-expr
-  "Reads an inline Clojure expression within Alda code.
-
-   This expression will be evaluated within the `boot.user` context, which has
-   the vars in `alda.lisp` referred in.
-
-   Returns ready-to-evaluate Clojure code."
-  [expr]
-  (read-string (str \( (apply str expr) \))))
-
-(def number-transforms
-  {:positive-number #(Integer/parseInt %)
-   :negative-number #(Integer/parseInt %)
-   :voice-number    #(Integer/parseInt %)})
-
-(def name-transforms
-  {:name     #(hash-map :name %)
-   :nickname #(hash-map :nickname %)})
-
-(def clj-expr-transforms
-  {:clj-character #(str \\ %)
-   :clj-string    #(str \" (apply str %&) \")
-   :clj-expr      #(read-clj-expr %&)})
+                                          "variables"
+                                          "whitespace"))
 
 (defn check-for-failure
   "Determines whether its input is an Instaparse failure, throwing an exception
@@ -83,6 +69,65 @@
 (defn- get-from-cache
   [cache id]
   (get @cache (symbol id)))
+
+(def number-transforms
+  {:positive-number #(Integer/parseInt %)
+   :negative-number #(Integer/parseInt %)
+   :voice-number    #(Integer/parseInt %)})
+
+(def name-transforms
+  {:name     #(hash-map :name %)
+   :nickname #(hash-map :nickname %)})
+
+(defn- read-clj-expr
+  "Reads an inline Clojure expression within Alda code.
+
+   This expression will be evaluated within the `boot.user` context, which has
+   the vars in `alda.lisp` referred in.
+
+   Returns ready-to-evaluate Clojure code."
+  [expr]
+  (read-string (str \( (apply str expr) \))))
+
+(def clj-expr-transforms
+  {:clj-character #(str \\ %)
+   :clj-string    #(str \" (apply str %&) \")
+   :clj-expr      #(read-clj-expr %&)})
+
+(def event-transforms
+  {:events          #(list* %&)
+   :repeat          (fn [event n]
+                      (list 'alda.lisp/times n event))
+   :event-sequence  #(list* 'do %&)
+   :variable-name   keyword
+   :get-variable    #(list 'alda.lisp/get-variable %)
+   :set-variable    (fn [var-name & body]
+                      (list* 'alda.lisp/set-variable var-name body))
+   :cram            #(list* 'alda.lisp/cram %&)
+   :voices          #(list* 'alda.lisp/voices %&)
+   :voice           (fn [voice-number & events]
+                      (list* 'alda.lisp/voice voice-number events))
+   :tie             (constantly :tie)
+   :slur            (constantly :slur)
+   :flat            (constantly :flat)
+   :sharp           (constantly :sharp)
+   :natural         (constantly :natural)
+   :dots            #(hash-map :dots (count %))
+   :note-length     #(list* 'alda.lisp/note-length %&)
+   :milliseconds    #(list 'alda.lisp/ms %)
+   :seconds         #(list 'alda.lisp/ms (* % 1000))
+   :duration        #(list* 'alda.lisp/duration %&)
+   :pitch           (fn [letter & accidentals]
+                      (list* 'alda.lisp/pitch (keyword letter) accidentals))
+   :note            #(list* 'alda.lisp/note %&)
+   :rest            #(list* 'alda.lisp/pause %&)
+   :chord           #(list* 'alda.lisp/chord %&)
+   :octave-set      #(list 'alda.lisp/octave %)
+   :octave-up       #(list 'alda.lisp/octave :up)
+   :octave-down     #(list 'alda.lisp/octave :down)
+   :marker          #(list 'alda.lisp/marker (:name %))
+   :at-marker       #(list 'alda.lisp/at-marker (:name %))
+   :barline         #(list 'alda.lisp/barline)})
 
 (defn remove-comments
   "Strips comments from a string of Alda code.
@@ -132,8 +177,9 @@
        header-parser
        check-for-failure
        (insta/transform
-         {:header #(list* %&)
-          :clj-expr-cached #(get-from-cache cache %)})))
+         (merge event-transforms
+                {:header          #(list* %&)
+                 :clj-expr-cached #(get-from-cache cache %) }))))
 
 (defn parse-part
   "Parses the events of a single call to an instrument part."
@@ -144,42 +190,8 @@
        (insta/transform
          (merge name-transforms
                 number-transforms
-                {:events          #(list* %&)
-                 :repeat          (fn [event n]
-                                    (list 'alda.lisp/times n event))
-                 :event-sequence  #(list* 'do %&)
-                 :cram            #(list* 'alda.lisp/cram %&)
-                 :voices          #(list* 'alda.lisp/voices %&)
-                 :voice           (fn [voice-number & events]
-                                    (list*
-                                      'alda.lisp/voice
-                                      voice-number
-                                      events))
-                 :tie             (constantly :tie)
-                 :slur            (constantly :slur)
-                 :flat            (constantly :flat)
-                 :sharp           (constantly :sharp)
-                 :natural         (constantly :natural)
-                 :dots            #(hash-map :dots (count %))
-                 :note-length     #(list* 'alda.lisp/note-length %&)
-                 :milliseconds    #(list 'alda.lisp/ms %)
-                 :seconds         #(list 'alda.lisp/ms (* % 1000))
-                 :duration        #(list* 'alda.lisp/duration %&)
-                 :pitch           (fn [letter & accidentals]
-                                    (list*
-                                      'alda.lisp/pitch
-                                      (keyword letter)
-                                      accidentals))
-                 :note            #(list* 'alda.lisp/note %&)
-                 :rest            #(list* 'alda.lisp/pause %&)
-                 :chord           #(list* 'alda.lisp/chord %&)
-                 :octave-set      #(list 'alda.lisp/octave %)
-                 :octave-up       #(list 'alda.lisp/octave :up)
-                 :octave-down     #(list 'alda.lisp/octave :down)
-                 :marker          #(list 'alda.lisp/marker (:name %))
-                 :at-marker       #(list 'alda.lisp/at-marker (:name %))
-                 :barline         #(list 'alda.lisp/barline)
-                 :clj-expr-cached #(get-from-cache cache %)}))))
+                event-transforms
+                {:clj-expr-cached #(get-from-cache cache %)}))))
 
 (defn parse-input
   "Parses a string of Alda code and turns it into alda.lisp (Clojure) code."

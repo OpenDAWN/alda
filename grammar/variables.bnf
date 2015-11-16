@@ -1,0 +1,22 @@
+variable-name = #"[a-zA-Z]{2}[\w_]*"
+
+get-variable = variable-name
+
+set-variable = variable-name <ows-inline> <"="> <ows-inline>
+               (event-sequence | events-inline)
+(*
+    - hopefully can write a grammar rule that handles both multi-line and
+      single-line variable-setting. something like, read events and non-newline
+      whitespace with a negative lookahead for the end-of-line or newline chars
+    - perhaps the first choice for this rule should be a single event sequence,
+      so things like this...
+
+        foo = [ a b > c ]   c/e/g
+
+      ...will correctly assign only the event sequence to the variable. that
+      way, if the first thing isn't an event sequence, then it will proceed
+      to the second choice and capture events until the first end-of-line or
+      newline that isn't part of some event that can contain them (such as
+      event sequences and crams)
+
+*)
