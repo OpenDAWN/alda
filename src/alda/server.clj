@@ -3,6 +3,7 @@
             [alda.lisp                :refer :all]
             [alda.parser-util         :refer (parse-with-context)]
             [alda.sound               :refer (*play-opts*)]
+            [alda.version             :refer (-version-)]
             [ring.middleware.defaults :refer (wrap-defaults api-defaults)]
             [ring.adapter.jetty       :refer (run-jetty)]
             [compojure.core           :refer :all]
@@ -21,18 +22,19 @@
   [code]
   (fn [body]
     {:status  code
-     :headers {"Content-Type" "text/html"}
+     :headers {"Content-Type"   "text/html"
+               "X-Alda-Version" -version-}
      :body    body}))
-
-(defn- edn-response
-  [x]
-  {:status 200
-   :headers {"Content-Type" "application/edn"}
-   :body (pr-str x)})
 
 (def ^:private success      (response 200))
 (def ^:private user-error   (response 400))
 (def ^:private server-error (response 500))
+
+(defn- edn-response
+  [x]
+  (-> (success (pr-str x))
+      (update :headers
+              assoc "Content-Type" "application/edn")))
 
 (defn handle-code
   [code]
@@ -69,6 +71,10 @@
       (score*)
       (binding [*play-opts* play-opts]
         (handle-code code))))
+
+  (GET "/version" []
+    (success (str "alda v" -version-)))
+
   (not-found "Invalid route."))
 
 (defn wrap-play-opts
