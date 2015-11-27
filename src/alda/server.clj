@@ -7,7 +7,8 @@
             [ring.middleware.defaults :refer (wrap-defaults api-defaults)]
             [ring.adapter.jetty       :refer (run-jetty)]
             [compojure.core           :refer :all]
-            [compojure.route          :refer (not-found)]))
+            [compojure.route          :refer (not-found)]
+            [clojure.pprint           :refer (pprint)]))
 
 (defn start-alda-environment!
   []
@@ -32,7 +33,7 @@
 
 (defn- edn-response
   [x]
-  (-> (success (pr-str x))
+  (-> (success (with-out-str (pprint x)))
       (update :headers
               assoc "Content-Type" "application/edn")))
 
@@ -80,7 +81,8 @@
 (defn wrap-play-opts
   [next-handler play-opts]
   (fn [request]
-    (next-handler (assoc request :play-opts play-opts))))
+    (-> (assoc request :play-opts play-opts)
+        next-handler)))
 
 (def app
   (-> (wrap-defaults server-routes api-defaults)
