@@ -34,26 +34,41 @@
 (def ^:private user-error   (response 400))
 (def ^:private server-error (response 500))
 
+(defn handle-code
+  [code]
+  (try
+    (require '[alda.lisp :refer :all])
+    (let [[context parse-result] (parse-with-context code)]
+      (if (= context :parse-failure)
+        (user-error "Invalid Alda syntax.")
+        (do
+          (now/play! (eval (case context
+                           :music-data (cons 'do parse-result)
+                           :score (cons 'do (rest parse-result))
+                           parse-result)))
+          (success "OK"))))
+    (catch Throwable e
+      (server-error (str "ERROR: " (.getMessage e))))))
+
 (defroutes server-routes
+  ; get the current score-map
   (GET "/" []
     (edn-response (score-map)))
+  ; delete the current score and start a new one
   (DELETE "/" []
     (score*)
     (success "New score initialized."))
-  (POST "/" {:keys [play-opts params] :as request}
-    (try
-      (let [{:keys [code]} params
-            [context parse-result] (parse-with-context code)]
-        (if (= context :parse-failure)
-          (user-error "Invalid Alda syntax.")
-          (binding [*play-opts* play-opts]
-            (now/play! (eval (case context
-                               :music-data (cons 'do parse-result)
-                               :score (cons 'do (rest parse-result))
-                               parse-result)))
-            (success "OK"))))
-      (catch Throwable e
-        (server-error (str "ERROR: " (.getMessage e))))))
+  ; evaluate code within the context of the current score
+  (POST "/" {:keys [play-opts body]:as request}
+    (let [code (slurp body)]
+      (binding [*play-opts* play-opts]
+        (handle-code code))))
+  ; overwrite the current score
+  (PUT "/" {:keys [play-opts body] :as request}
+    (let [code (slurp body)]
+      (score*)
+      (binding [*play-opts* play-opts]
+        (handle-code code))))
   (not-found "Invalid route."))
 
 (defn wrap-play-opts
