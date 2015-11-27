@@ -2,6 +2,7 @@
   (:require [alda.now                 :as    now]
             [alda.lisp                :refer :all]
             [alda.parser-util         :refer (parse-with-context)]
+            [alda.sound               :refer (*play-opts*)]
             [ring.middleware.defaults :refer (wrap-defaults api-defaults)]
             [ring.adapter.jetty       :refer (run-jetty)]
             [compojure.core           :refer :all]
@@ -30,12 +31,13 @@
 (defroutes server-routes
   (GET "/" []
     (str (score-map)))
-  (POST "/" [code]
+  (POST "/" {:keys [play-opts params] :as request}
     (try
-      (let [[context parse-result] (parse-with-context code)]
+      (let [{:keys [code]} params
+            [context parse-result] (parse-with-context code)]
         (if (= context :parse-failure)
           (user-error "Invalid Alda syntax.")
-          (do
+          (binding [*play-opts* play-opts]
             (now/play! (eval (case context
                                :music-data (cons 'do parse-result)
                                :score (cons 'do (rest parse-result))
@@ -45,8 +47,14 @@
         (server-error (str "ERROR: " (.getMessage e))))))
   (not-found "Invalid route."))
 
+(defn wrap-play-opts
+  [next-handler play-opts]
+  (fn [request]
+    (next-handler (assoc request :play-opts play-opts))))
+
 (def app
-  (wrap-defaults server-routes api-defaults))
+  (-> (wrap-defaults server-routes api-defaults)
+      (wrap-play-opts *play-opts*)))
 
 (defn start-server!
   [port]

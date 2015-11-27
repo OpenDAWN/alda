@@ -92,10 +92,8 @@
             alda.sound/*play-opts* {:pre-buffer  pre-buffer
                                     :post-buffer post-buffer
                                     :async?      true}]
-    (eval
-      `(do
-         (require '[alda.server])
-         (alda.server/start-server! (or ~port 27713))))))
+    (require 'alda.server)
+    ((resolve 'alda.server/start-server!) (or port 27713))))
 
 (defclifn ^:alda-task script
   "Print the latest `alda` start script to STDOUT."
