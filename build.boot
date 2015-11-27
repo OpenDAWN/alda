@@ -10,6 +10,7 @@
                   [clj-http              "2.0.0"]
                   [ring                  "1.4.0"]
                   [ring/ring-defaults    "0.1.5"]
+                  [compojure             "1.4.0"]
                   [djy                   "0.1.4"]
                   [str-to-argv           "0.1.0"]
                   [overtone/at-at        "1.2.0"]
