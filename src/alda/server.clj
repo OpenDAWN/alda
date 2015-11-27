@@ -24,13 +24,22 @@
      :headers {"Content-Type" "text/html"}
      :body    body}))
 
+(defn- edn-response
+  [x]
+  {:status 200
+   :headers {"Content-Type" "application/edn"}
+   :body (pr-str x)})
+
 (def ^:private success      (response 200))
 (def ^:private user-error   (response 400))
 (def ^:private server-error (response 500))
 
 (defroutes server-routes
   (GET "/" []
-    (str (score-map)))
+    (edn-response (score-map)))
+  (DELETE "/" []
+    (score*)
+    (success "New score initialized."))
   (POST "/" {:keys [play-opts params] :as request}
     (try
       (let [{:keys [code]} params
