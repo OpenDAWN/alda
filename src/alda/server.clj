@@ -1,6 +1,7 @@
 (ns alda.server
   (:require [alda.now                 :as    now]
             [alda.lisp                :refer :all]
+            [alda.parser              :refer (parse-input)]
             [alda.parser-util         :refer (parse-with-context)]
             [alda.sound               :refer (*play-opts*)]
             [alda.version             :refer (-version-)]
@@ -53,6 +54,17 @@
     (catch Throwable e
       (server-error (str "ERROR: " (.getMessage e))))))
 
+(defn handle-code-parse
+  [code & {:keys [mode] :or {mode :lisp}}]
+  (try
+    (require '[alda.lisp :refer :all])
+    (let [parse-result (parse-input code)]
+      (edn-response (case mode
+                      :lisp parse-result
+                      :map (eval parse-result))))
+    (catch Throwable e
+      (server-error (str "ERROR: " (.getMessage e))))))
+
 (defroutes server-routes
   ; get the current score-map
   (GET "/" []
@@ -72,6 +84,18 @@
       (score*)
       (binding [*play-opts* play-opts]
         (handle-code code))))
+
+  (POST "/parse" {:keys [body] :as request}
+    (let [code (slurp body)]
+      (handle-code-parse code)))
+
+  (POST "/parse/lisp" {:keys [body] :as request}
+    (let [code (slurp body)]
+      (handle-code-parse code :mode :lisp)))
+
+  (POST "/parse/map" {:keys [body] :as request}
+    (let [code (slurp body)]
+      (handle-code-parse code :mode :map)))
 
   (GET "/version" []
     (success (str "alda v" -version-)))
